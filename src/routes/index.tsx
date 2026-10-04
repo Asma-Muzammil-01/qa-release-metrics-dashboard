@@ -29,7 +29,7 @@ const axis = { stroke: "var(--muted-foreground)", fontSize: 11, tickLine: false,
 function Dashboard() {
   const [releases, setReleases] = useState<Release[]>(() => buildReleases());
   const [idx, setIdx] = useState(1);
-  const r = releases[idx];
+  const r = releases[idx] ?? releases[0]!;
   const { score, pass } = useMemo(() => readiness(r), [r]);
   const projects = [...new Set(releases.map((x) => x.project))];
 
@@ -215,7 +215,7 @@ function Sidebar({ release, onApply }: { release: Release; onApply: (r: Release)
   const [lastKey, setLastKey] = useState(key);
   if (key !== lastKey) {
     setLastKey(key);
-    const last = release.execution[release.execution.length - 1];
+    const last = release.execution[release.execution.length - 1] ?? { day: "D-0", passed: 0, failed: 0 };
     setForm({ passed: String(last.passed), failed: String(last.failed), critical: String(release.bugs.critical), high: String(release.bugs.high), medium: String(release.bugs.medium), low: String(release.bugs.low), coverage: String(release.coverage) });
     setJson("");
   }
@@ -228,7 +228,7 @@ function Sidebar({ release, onApply }: { release: Release; onApply: (r: Release)
   const applyForm = (e: React.FormEvent) => {
     e.preventDefault();
     const exec = [...release.execution];
-    const last = exec[exec.length - 1];
+    const last = exec[exec.length - 1] ?? { day: "D-0", passed: 0, failed: 0 };
     exec[exec.length - 1] = { ...last, passed: num(form.passed, last.passed), failed: num(form.failed, last.failed) };
     onApply({
       ...release,
