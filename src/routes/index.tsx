@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis, RadialBar, RadialBarChart, PolarAngleAxis,
 } from "recharts";
 import { buildReleases, readiness, type Release } from "@/lib/qa-data";
+import { CompareView } from "@/components/CompareView";
+import { RiskAnalyzer } from "@/components/RiskAnalyzer";
+import { exportReleasePdf } from "@/lib/pdf-export";
+import type { RiskReport } from "@/lib/risk.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,12 +33,27 @@ const axis = { stroke: "var(--muted-foreground)", fontSize: 11, tickLine: false,
 function Dashboard() {
   const [releases, setReleases] = useState<Release[]>(() => buildReleases());
   const [idx, setIdx] = useState(1);
+  const [view, setView] = useState<"dashboard" | "compare" | "ai">("dashboard");
+  const [reports, setReports] = useState<Record<string, RiskReport | null>>({});
+  const [exporting, setExporting] = useState(false);
+  const chartsRef = useRef<HTMLElement>(null);
   const r = releases[idx] ?? releases[0]!;
+  const rKey = r.project + r.version;
   const { score, pass } = useMemo(() => readiness(r), [r]);
   const projects = [...new Set(releases.map((x) => x.project))];
 
   const update = (next: Release) =>
     setReleases((all) => all.map((x, i) => (i === idx ? next : x)));
+
+  const doExport = async () => {
+    setExporting(true);
+    if (view !== "dashboard") { setView("dashboard"); await new Promise((res) => setTimeout(res, 600)); }
+    try {
+      if (chartsRef.current) await exportReleasePdf(r, chartsRef.current, reports[rKey] ?? null);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const sevData = [
     { name: "Critical", value: r.bugs.critical, color: "var(--sev-critical)" },
@@ -78,7 +97,22 @@ function Dashboard() {
           </div>
         </header>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <nav className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="panel flex gap-1 p-1">
+            {([["dashboard", "Dashboard"], ["compare", "Compare releases"], ["ai", "AI risk analysis"]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setView(k)} className={`rounded-md px-3 py-1.5 text-xs font-medium ${view === k ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{l}</button>
+            ))}
+          </div>
+          <button onClick={doExport} disabled={exporting} className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50">
+            {exporting ? "Preparing PDF…" : `Export ${r.version} report (PDF)`}
+          </button>
+        </nav>
+
+        {view === "compare" && <CompareView releases={releases} />}
+        {view === "ai" && <RiskAnalyzer release={r} report={reports[rKey] ?? null} onReport={(rep) => setReports((s) => ({ ...s, [rKey]: rep }))} />}
+
+        {view === "dashboard" && (
+        <section ref={chartsRef} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="panel row-span-2 flex flex-col p-5">
             <p className="eyebrow">Release Readiness Score</p>
             <div className="relative h-52">
@@ -183,6 +217,7 @@ function Dashboard() {
             </ResponsiveContainer>
           </Card>
         </section>
+        )}
       </main>
     </div>
   );
