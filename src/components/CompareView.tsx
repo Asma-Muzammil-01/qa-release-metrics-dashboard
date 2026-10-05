@@ -126,7 +126,7 @@ export function CompareView({ releases }: { releases: Release[] }) {
                   <Tooltip {...tip} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   {picked.map(({ r }, j) => (
-                    <Line key={label(r)} type="monotone" dataKey={label(r)} stroke={COLORS[j % COLORS.length]} strokeWidth={2} dot={false} />
+                    <Line key={label(r)} type="monotone" dataKey={label(r)} stroke={COLORS[j % COLORS.length] ?? "var(--pass)"} strokeWidth={2} dot={false} />
                   ))}
                 </LineChart>
               </ResponsiveContainer>
